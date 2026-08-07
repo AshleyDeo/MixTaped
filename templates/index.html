@@ -1,0 +1,112 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+
+<h1>Home</h1>
+
+<h3>Users</h3>
+<table>
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>Username</th>
+			<th>Password</th>
+			<th>Email</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for row in tables[0] %}
+		<tr>
+			<td>{{ row[0] }}</td>
+			<td>{{ row[1] }}</td>
+			<td>{{ row[2] }}</td>
+			<td>{{ row[3] }}</td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
+<h3>Artists</h3>
+<table>
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>Username</th>
+			<th>Password</th>
+			<th>Email</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for row in tables[1] %}
+		<tr>
+			<td>{{ row[0] }}</td>
+			<td>{{ row[1] }}</td>
+			<td>{{ row[2] }}</td>
+			<td>{{ row[3] }}</td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
+<h3>Albums</h3>
+<table>
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>Username</th>
+			<th>Password</th>
+			<th>Email</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for row in tables[2] %}
+		<tr>
+			<td>{{ row[0] }}</td>
+			<td>{{ row[1] }}</td>
+			<td>{{ row[2] }}</td>
+			<td>{{ row[3] }}</td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
+<h3>Songs</h3>
+<table>
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>Username</th>
+			<th>Password</th>
+			<th>Email</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for row in tables[3] %}
+		<tr>
+			<td>{{ row[0] }}</td>
+			<td>{{ row[1] }}</td>
+			<td>{{ row[2] }}</td>
+			<td>{{ row[3] }}</td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
+<h3>Genres</h3>
+<table>
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>Username</th>
+			<th>Password</th>
+			<th>Email</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for row in tables[4] %}
+		<tr>
+			<td>{{ row[0] }}</td>
+			<td>{{ row[1] }}</td>
+			<td>{{ row[2] }}</td>
+			<td>{{ row[3] }}</td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
+{% endblock %}

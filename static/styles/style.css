@@ -1,0 +1,55 @@
+table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+th,
+td {
+	text-align: left;
+	padding: 8px;
+}
+
+tr:nth-child(even) {
+	background-color: powderblue
+}
+
+th {
+	background-color: palevioletred;
+	color: white;
+}
+
+.nav-button,
+button{
+	background-color: paleturquoise;
+	color: black;
+	padding: 0.2em 0.5em;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+	border-radius: 0.5em;
+}
+
+.logo-title {
+	font-size: 1.4em;
+	text-decoration: none;
+	color: darkmagenta;
+	font-weight: bold;
+}
+.alert-danger{
+	color: red;
+}
+.alert-success{
+	color: darkgreen;
+}
+
+#player {
+	height: 3em;
+	position: fixed;
+	bottom: 0%;
+	left: 0%;
+	width: 100%;
+	background-color: #393838;
+	color: white;
+	opacity: 1;
+	padding: 1em;
+}
