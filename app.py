@@ -30,7 +30,7 @@ INSERT_USER = '''INSERT INTO users (username, password, email) VALUES (%s, %s, %
 INSERT_GENRE = '''INSERT INTO genres (genre) VALUES (%s) RETURNING *;'''
 INSERT_ARTIST = '''INSERT INTO artists (name) VALUES (%s) RETURNING *;'''
 INSERT_ALBUM = '''INSERT INTO albums (album_title, released) VALUES (%s,%s) RETURNING *;'''
-INSERT_SONG = '''INSERT INTO songs (song_title, length, track_number) VALUES (%s,%s,%s,%s) RETURNING *;'''
+INSERT_SONG = '''INSERT INTO songs (song_title, length, track_number, album_id) VALUES (%s,%s,%s,%s) RETURNING *;'''
 
 ### SQL - SELECT
 SELECT_USERS = '''SELECT * FROM users;'''
@@ -44,7 +44,7 @@ SELECT_USER_LOGIN = '''SELECT * FROM users WHERE email = %s AND password = %s;''
 SELECT_GENRE = '''SELECT * FROM genres WHERE genre = %s;'''
 SELECT_ARTIST = '''SELECT * FROM artists WHERE name=%s;'''
 SELECT_ALBUM = '''SELECT * FROM albums WHERE album_title=%s AND released=%s;'''
-SELECT_SONG = '''SELECT * FROM songs WHERE song_title=%s AND length=%s AND track_number=%s;'''
+SELECT_SONG = '''SELECT * FROM songs WHERE song_title=%s AND album_id=%s '''
 
 load_dotenv()
 
@@ -59,7 +59,7 @@ connection = psycopg2.connect(database=os.environ.get("DB_NAME"), user=os.enviro
 def parseAudioData(file):
 	data = TinyTag.get(file)
 	print(data.artist) 
-	print(data.other.get('artist')) 
+	print(data.other.get('artist'))
 	## data.year: 2017-06-17 -- datetime.strptime('2014-12-04', '%Y-%m-%d').date()
 	genre_ids = []
 	artist_ids = []
@@ -99,12 +99,14 @@ def parseAudioData(file):
 			album = cursor.fetchone()
 			if album is None:
 				cursor.execute(INSERT_ALBUM, (data.album, dt.datetime.strptime(data.year, '%Y-%m-%d').date()))			
-	# 			album = cursor.fetchone()
-	# 		cursor.execute(SELECT_SONG, (data.title, data.track))
-	# 		song = cursor.fetchone()
-	# 		if song is None:
-	# 			cursor.execute(INSERT_SONG, (data.title, data.duration, data.track))
-	# 			song = cursor.fetchone()
+				album = cursor.fetchone()
+
+			print(type(album[0]))
+			cursor.execute(SELECT_SONG, (data.title, album[0])) 
+			song = cursor.fetchone()
+			if song is None:
+				cursor.execute(INSERT_SONG, (data.title, data.duration, data.track, album[0]))
+				song = cursor.fetchone()
 
 	return None
 
