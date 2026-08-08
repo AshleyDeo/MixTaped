@@ -30,7 +30,7 @@
 	<thead>
 		<tr>
 			<th>ID</th>
-			<th>Title</th>
+			<th>Name</th>
 			<th>Description</th>
 		</tr>
 	</thead>
@@ -49,9 +49,8 @@
 	<thead>
 		<tr>
 			<th>ID</th>
-			<th>Username</th>
-			<th>Password</th>
-			<th>Email</th>
+			<th>Album Title</th>
+			<th>Year</th>
 		</tr>
 	</thead>
 	<tbody>
@@ -60,7 +59,6 @@
 			<td>{{ row[0] }}</td>
 			<td>{{ row[1] }}</td>
 			<td>{{ row[2] }}</td>
-			<td>{{ row[3] }}</td>
 		</tr>
 		{% endfor %}
 	</tbody>
@@ -70,9 +68,11 @@
 	<thead>
 		<tr>
 			<th>ID</th>
-			<th>Username</th>
-			<th>Password</th>
-			<th>Email</th>
+			<th>Title</th>
+			<th>Album</th>
+			<th>Song Length</th>
+			<th>Track Number</th>
+			<th>filetype</th>
 		</tr>
 	</thead>
 	<tbody>
@@ -82,6 +82,8 @@
 			<td>{{ row[1] }}</td>
 			<td>{{ row[2] }}</td>
 			<td>{{ row[3] }}</td>
+			<td>{{ row[4] }}</td>
+			<td>{{ row[5] }}</td>
 		</tr>
 		{% endfor %}
 	</tbody>
@@ -99,8 +101,6 @@
 		<tr>
 			<td>{{ row[0] }}</td>
 			<td>{{ row[1] }}</td>
-			<td>{{ row[2] }}</td>
-			<td>{{ row[3] }}</td>
 		</tr>
 		{% endfor %}
 	</tbody>
