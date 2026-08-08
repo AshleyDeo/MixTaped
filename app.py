@@ -1,5 +1,7 @@
+import datetime as dt
 import os 
 import psycopg2
+import re
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, request, render_template, session, url_for
 #from flask_bcrypt import Bcrypt
@@ -12,7 +14,7 @@ CREATE_TABLE_USERS = '''CREATE TABLE IF NOT EXISTS users (user_id SERIAL PRIMARY
 
 CREATE_TABLE_ARTISTS = '''CREATE TABLE IF NOT EXISTS artists (artist_id SERIAL PRIMARY KEY, name VARCHAR(50) NOT NULL, description TEXT);'''
 
-CREATE_TABLE_ALBUMS = '''CREATE TABLE IF NOT EXISTS albums (album_id SERIAL PRIMARY KEY, album_title VARCHAR(25) NOT NULL, release_year varchar(6) DEFAULT "2026", UNIQUE (album_id, album_title));'''
+CREATE_TABLE_ALBUMS = '''CREATE TABLE IF NOT EXISTS albums (album_id SERIAL PRIMARY KEY, album_title VARCHAR(25) NOT NULL, released varchar(6) DEFAULT "2026", UNIQUE (album_id, album_title));'''
 
 CREATE_TABLE_SONGS = '''CREATE TABLE IF NOT EXISTS songs (song_id SERIAL, song_title VARCHAR(25) NOT NULL, album_id integer REFERENCES albums on delete cascade, length integer  DEFAULT 0 NOT NULL, track_number integer DEFAULT 0 NOT NULL, fileType VARCHAR(10), PRIMARY KEY (song_id, song_title, album_id));'''
 
@@ -27,7 +29,7 @@ CREATE_TABLE_FILES = '''CREATE TABLE IF NOT EXISTS files (id SERIAL PRIMARY KEY,
 INSERT_USER = '''INSERT INTO users (username, password, email) VALUES (%s, %s, %s) RETURNING *;'''
 INSERT_GENRE = '''INSERT INTO genres (genre) VALUES (%s) RETURNING *;'''
 INSERT_ARTIST = '''INSERT INTO artists (name) VALUES (%s) RETURNING *;'''
-INSERT_ALBUM = '''INSERT INTO albums (album_title, release_year) VALUES (%s,%s) RETURNING *;'''
+INSERT_ALBUM = '''INSERT INTO albums (album_title, released) VALUES (%s,%s) RETURNING *;'''
 INSERT_SONG = '''INSERT INTO songs (song_title, length, track_number) VALUES (%s,%s,%s,%s) RETURNING *;'''
 
 ### SQL - SELECT
@@ -41,7 +43,7 @@ SELECT_GENRES = '''SELECT * FROM genres;'''
 SELECT_USER_LOGIN = '''SELECT * FROM users WHERE email = %s AND password = %s;'''
 SELECT_GENRE = '''SELECT * FROM genres WHERE genre = %s;'''
 SELECT_ARTIST = '''SELECT * FROM artists WHERE name=%s;'''
-SELECT_ALBUM = '''SELECT * FROM albums WHERE album_title=%s AND release_year=%s;'''
+SELECT_ALBUM = '''SELECT * FROM albums WHERE album_title=%s AND released=%s;'''
 SELECT_SONG = '''SELECT * FROM songs WHERE song_title=%s AND length=%s AND track_number=%s;'''
 
 load_dotenv()
@@ -56,23 +58,47 @@ connection = psycopg2.connect(database=os.environ.get("DB_NAME"), user=os.enviro
 
 def parseAudioData(file):
 	data = TinyTag.get(file)
-	print(data.genre)
-	# with connection:
-	# 	with connection.cursor() as cursor:
-	# 		cursor.execute(SELECT_GENRE, data.genre)
-	# 		genre = cursor.fetchone()
-	# 		if genre is None:
-	# 			cursor.execute(INSERT_GENRE, (data.genre))
-	# 			genre = cursor.fetchone()
-	# 		cursor.execute(SELECT_ARTIST, (data.artist))
-	# 		artist = cursor.fetchone()
-	# 		if artist is None:
-	# 			cursor.execute(INSERT_ARTIST, (data.artist))
-	# 			artist = cursor.fetchone()
-	# 		cursor.execute(SELECT_ALBUM, (data.album, data.year))			
-	# 		album = cursor.fetchone()
-	# 		if album is None:
-	# 			cursor.execute(INSERT_ALBUM, (data.album, data.year))			
+	print(data.artist) 
+	print(data.other.get('artist')) 
+	## data.year: 2017-06-17 -- datetime.strptime('2014-12-04', '%Y-%m-%d').date()
+	genre_ids = []
+	artist_ids = []
+	with connection:
+		with connection.cursor() as cursor:
+			for g in re.split(r'[;,/]+', data.genre):
+				g = g.strip()
+				print(g)
+				if type(g) is not None:
+					# print(type(g))
+					cursor.execute(SELECT_GENRE, (g,))
+					genre = cursor.fetchone()
+					if genre is None:
+						cursor.execute(INSERT_GENRE, (g,))
+						genre = cursor.fetchone()
+					genre_ids.append(genre[0])
+
+			cursor.execute(SELECT_ARTIST, (data.artist,))
+			artist = cursor.fetchone()
+			if artist is None:
+				cursor.execute(INSERT_ARTIST, (data.artist,))
+				artist = cursor.fetchone()
+			artist_ids.append(genre[0])
+
+			if data.other.get('artist'):
+				for a in re.split(r'[;,/]+', data.other.get('artist')):
+					print(a)
+					if type(a) is not None:
+						# print(type(a))
+						cursor.execute(SELECT_ARTIST, (a,))
+						artist = cursor.fetchone()
+						if artist is None:
+							cursor.execute(INSERT_ARTIST, (a,))
+							artist = cursor.fetchone()
+						artist_ids.append(artist[0])
+			cursor.execute(SELECT_ALBUM, (data.album, dt.datetime.strptime(data.year, '%Y-%m-%d').date()))			
+			album = cursor.fetchone()
+			if album is None:
+				cursor.execute(INSERT_ALBUM, (data.album, dt.datetime.strptime(data.year, '%Y-%m-%d').date()))			
 	# 			album = cursor.fetchone()
 	# 		cursor.execute(SELECT_SONG, (data.title, data.track))
 	# 		song = cursor.fetchone()
