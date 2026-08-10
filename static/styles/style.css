@@ -1,12 +1,13 @@
 table {
 	border-collapse: collapse;
 	width: 100%;
+	
 }
 
 th,
 td {
 	text-align: left;
-	padding: 8px;
+	padding: 0.25em;
 }
 
 tr:nth-child(even) {
@@ -44,9 +45,9 @@ button{
 
 #player {
 	height: 3em;
-	position: fixed;
+	/* position: fixed;
 	bottom: 0%;
-	left: 0%;
+	left: 0%; */
 	width: 100%;
 	background-color: #393838;
 	color: white;

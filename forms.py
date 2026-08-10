@@ -18,3 +18,7 @@ class LoginForm(FlaskForm):
 class AudioForm(FlaskForm):
 	song = FileField('Audio File')
 	submit = SubmitField('Submit')
+
+class ReviewForm(FlaskForm):
+	review = StringField('Comment', validators=[DataRequired()])
+	submit = SubmitField('Submit')
