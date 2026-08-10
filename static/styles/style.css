@@ -54,3 +54,7 @@ button{
 	opacity: 1;
 	padding: 1em;
 }
+
+body {
+	padding-bottom: 70px;
+}
