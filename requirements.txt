@@ -1,14 +1,8 @@
-Code to auto pickup changes to your code on your live site
-py -m flask --debug run --host=0.0.0.0
+flask
+python-dotenv
+psycopg2-binary
 
-For all flask libraries
-pip install -U Flask-WTF
-
-psycop to connect to database
-pip install psycopg2-binary
-
-For env files to run off local database
-pip install python-dotenv
+py -m flask run --host=0.0.0.0 
 
 -- Sources
 https://www.youtube.com/watch?v=DlNIXC9SaF4
