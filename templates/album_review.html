@@ -2,6 +2,53 @@
 
 {% block content %}
 <h2>{{album[1]}}</h2>
-<h3><a href="/artist/{{album[5]}}">by {{album[5]}}</a></h3>
-<div>releasd {{album[3]}}</div>
+<h3>by <a href="/artist/{{album[4]}}">{{album[5]}}</a></h3>
+<div>Released: {{album[3]}}</div>
+</div>
+<div>
+	{% for genre in genres %}
+	<span class="genre">
+		<a href="/genre/{{genre[0]}}">{{genre[1]}}</a>
+	</span>
+
+	{% endfor %}
+</div>
+<h3>Tracklist</h3>
+<table>
+	<thead>
+		<tr>
+			<th>Track</th>
+			<th>Title</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for row in songs %}
+		<tr>
+			<td>{{ row[4] }}</td>
+			<td><a href="/song/{{row[0]}}">{{ row[1] }}</a></td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
+<h3>Reviews</h3>
+<table>
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>User</th>
+			<th>Comment</th>
+			<th>Date</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for row in reviews %}
+		<tr>
+			<td>{{ row[0] }}</td>
+			<td>{{ row[1] }}</td>
+			<td>{{ row[2] }}</td>
+			<td>{{ row[3] }}</td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
 {%endblock%}

@@ -29,6 +29,15 @@ button{
 	display: inline-block;
 	border-radius: 0.5em;
 }
+.genre, .genre > a{
+	background-color: paleturquoise;
+	color: black;
+	padding: 0.1em 0.25em;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+	border-radius: 0.5em;
+}
 
 .logo-title {
 	font-size: 1.4em;

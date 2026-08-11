@@ -5,19 +5,64 @@ import re
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, request, render_template, session, url_for
 #from flask_bcrypt import Bcrypt
-from forms import RegisterForm, LoginForm, AudioForm
+from forms import RegisterForm, LoginForm, AudioForm, ReviewForm
 from tinytag import TinyTag
 from werkzeug.utils import secure_filename
 
 ### SQL - CREATE TABLE
-CREATE_TABLE_USERS = '''CREATE TABLE IF NOT EXISTS users (user_id SERIAL PRIMARY KEY, username VARCHAR(25) NOT NULL UNIQUE, password VARCHAR(30) NOT NULL, email VARCHAR(100) NOT NULL);'''
-CREATE_TABLE_ARTISTS = '''CREATE TABLE IF NOT EXISTS artists (artist_id SERIAL PRIMARY KEY, name VARCHAR(50) NOT NULL, description TEXT);'''
-CREATE_TABLE_ALBUMS = '''CREATE TABLE IF NOT EXISTS albums (album_id SERIAL PRIMARY KEY, album_title VARCHAR(50) NOT NULL, artist_id integer REFERENCES artists on delete cascade, released date NOT NULL DEFAULT now(), UNIQUE (album_id, album_title));'''
-CREATE_TABLE_SONGS = '''CREATE TABLE IF NOT EXISTS songs (song_id SERIAL, song_title VARCHAR(50) NOT NULL, album_id integer REFERENCES albums on delete cascade, length integer  DEFAULT 0 NOT NULL, track_number integer DEFAULT 0 NOT NULL, PRIMARY KEY (song_id, song_title, album_id));'''
+CREATE_TABLE_USERS = '''CREATE TABLE IF NOT EXISTS users (
+	user_id SERIAL PRIMARY KEY, 
+	username VARCHAR(25) NOT NULL UNIQUE, 
+	password VARCHAR(30) NOT NULL, 
+	email VARCHAR(100) NOT NULL
+);'''
+CREATE_TABLE_ARTISTS = '''CREATE TABLE IF NOT EXISTS artists (
+	artist_id SERIAL PRIMARY KEY, 
+	name VARCHAR(50) NOT NULL, 
+	description TEXT
+);'''
+CREATE_TABLE_ALBUMS = '''CREATE TABLE IF NOT EXISTS albums (
+	album_id SERIAL PRIMARY KEY, 
+	album_title VARCHAR(50) NOT NULL, 
+	artist_id integer REFERENCES artists ON DELETE CASCADE, 
+	released date NOT NULL DEFAULT now(), 
+	UNIQUE (album_id, album_title)
+);'''
+CREATE_TABLE_SONGS = '''CREATE TABLE IF NOT EXISTS songs (
+	song_id SERIAL PRIMARY KEY, 
+	song_title VARCHAR(50) NOT NULL, 
+	album_id integer REFERENCES albums ON DELETE CASCADE, 
+	length integer  DEFAULT 0 NOT NULL, 
+	track_number integer DEFAULT 0 NOT NULL
+);'''
 CREATE_TABLE_GENRES = '''CREATE TABLE IF NOT EXISTS genres (genre_id SERIAL PRIMARY KEY, genre VARCHAR(25) NOT NULL UNIQUE);'''
-CREATE_TABLE_PLAYLISTS = '''CREATE TABLE IF NOT EXISTS playlists (playlist_id SERIAL PRIMARY KEY, user_id integer REFERENCES users on delete cascade, playlist_name VARCHAR(50) NOT NULL UNIQUE);'''
-CREATE_ALBUM_REVIEWS = '''CREATE TABLE IF NOT EXISTS album_reviews (id SERIAL PRIMARY KEY, user_id integer REFERENCES users on delete cascade, album_id integer REFERENCES albums on delete cascade, review TEXT);'''
-CREATE_SONG_REVIEWS = '''CREATE TABLE IF NOT EXISTS song_reviews (song_review_id SERIAL PRIMARY KEY, user_id integer REFERENCES users on delete cascade, song_id integer REFERENCES songs on delete cascade, review TEXT);''' 
+CREATE_TABLE_PLAYLISTS = '''CREATE TABLE IF NOT EXISTS playlists (
+	playlist_id SERIAL PRIMARY KEY, 
+	user_id integer REFERENCES users ON DELETE CASCADE, 
+	playlist_name VARCHAR(50) NOT NULL UNIQUE
+);'''
+CREATE_ALBUM_REVIEWS = '''CREATE TABLE IF NOT EXISTS album_reviews (
+	album_review_id SERIAL PRIMARY KEY, 
+	user_id integer REFERENCES users (user_id) ON DELETE CASCADE, 
+	album_id integer REFERENCES albums (album_id) ON DELETE CASCADE, 
+	review TEXT, 
+	review_date TIMESTAMP
+);'''
+CREATE_SONG_REVIEWS = '''CREATE TABLE IF NOT EXISTS song_reviews (
+	song_review_id SERIAL PRIMARY KEY, 
+	user_id integer REFERENCES users (user_id) ON DELETE CASCADE, 
+	song_id integer REFERENCES songs (song_id) ON DELETE CASCADE, 
+	review TEXT, 
+	review_date TIMESTAMP
+);''' 
+CREATE_ARTIST_GENRES = '''CREATE TABLE IF NOT EXISTS artist_genres (
+    artist_id integer REFERENCES artists ON DELETE CASCADE,
+    genre_id integer REFERENCES genres ON DELETE CASCADE
+);'''
+CREATE_SONG_GENRES = '''CREATE TABLE IF NOT EXISTS song_genres (
+    song_id integer REFERENCES songs ON DELETE CASCADE,
+    genre_id integer REFERENCES genres ON DELETE CASCADE
+);'''
 CREATE_TABLE_FILES = '''CREATE TABLE IF NOT EXISTS files (id SERIAL PRIMARY KEY, filename VARCHAR(10), file_url TEXT);'''
 
 ### SQL - SELECT
@@ -26,6 +71,8 @@ SELECT_ARTISTS = '''SELECT * FROM artists;'''
 SELECT_ALBUMS = '''SELECT * FROM albums;'''
 SELECT_SONGS = '''SELECT * FROM songs;'''
 SELECT_GENRES = '''SELECT * FROM genres;'''
+SELECT_SONG_GENRES = '''SELECT * FROM song_genres;'''
+SELECT_ARTIST_GENRES = '''SELECT * FROM artist_genres;'''
 SELECT_SONG_REVIEWS = '''SELECT * FROM song_reviews WHERE song_id=%s;'''
 SELECT_ALBUM_REVIEWS = '''SELECT * FROM album_reviews WHERE album_id=%s;'''
 
@@ -36,18 +83,37 @@ SELECT_ARTIST = '''SELECT * FROM artists WHERE name=%s;'''
 SELECT_ALBUM = '''SELECT * FROM albums WHERE album_title=%s AND artist_id=%s AND released=%s;'''
 SELECT_SONG = '''SELECT * FROM songs WHERE song_title=%s AND album_id=%s;'''
 SELECT_SONG_BY_ID = '''SELECT * FROM songs JOIN albums ON songs.album_id=albums.album_id JOIN artists ON albums.artist_id=artists.artist_id  WHERE song_id=%s;'''
+SELECT_SONGS_BY_ALBUM_ID = '''SELECT * FROM songs WHERE album_id=%s ORDER BY track_number ASC;'''
+INSERT_ARTIST_GENRE = '''INSERT INTO artist_genres (artist_id, genre_id) VALUES (%s,%s) RETURNING *;'''
 SELECT_REVIEWS_BY_SONGID = '''SELECT * FROM song_reviews WHERE song_id=%s;'''
 SELECT_ALBUM_BY_ID = '''SELECT * FROM albums JOIN artists ON albums.artist_id=artists.artist_id  WHERE album_id=%s;'''
 SELECT_REVIEWS_BY_ALBUMID = '''SELECT * FROM album_reviews WHERE album_id=%s;'''
+SELECT_GENRES_BY_SONG_ID = '''SELECT genres.* FROM song_genres JOIN genres ON song_genres.genre_id=genres.genre_id WHERE song_id=%s;'''
+SELECT_GENRES_BY_ALBUM_ID = '''SELECT genres.* FROM songs JOIN song_genres ON songs.song_id=song_genres.song_id JOIN genres ON song_genres.genre_id=genres.genre_id WHERE album_id=%s;'''
+SELECT_SONG_GENRE = '''SELECT * FROM song_genres WHERE genre_id=%s AND song_id=%s;'''
+SELECT_ARTIST_GENRE = '''SELECT * FROM artist_genres WHERE genre_id=%s AND artist_id=%s;'''
+SELECT_ARTIST_BY_ID = '''SELECT * FROM artists WHERE artist_id=%s;'''
+SELECT_GENRE_BY_ID = '''SELECT * FROM genres WHERE genre_id=%s;'''
+SELECT_ALBUMS_BY_ARTIST_ID = '''SELECT * FROM albums WHERE artist_id=%s ORDER BY released DESC;'''
+SELECT_GENRES_BY_ARTIST_ID = '''SELECT DISTINCT genres.* FROM artist_genres JOIN genres ON artist_genres.genre_id=genres.genre_id WHERE artist_id=%s GROUP BY genres.genre_id;'''
+SELECT_ARTISTS_BY_GENRE_ID = '''SELECT artists.* FROM artist_genres JOIN artists ON artist_genres.artist_id=artists.artist_id WHERE genre_id=%s;'''
+SELECT_SONGS_BY_GENRE_ID = '''SELECT songs.*, artists.artist_id, artists.name FROM song_genres 
+JOIN songs ON song_genres.song_id=songs.song_id 
+JOIN albums ON songs.album_id=albums.album_id 
+JOIN artists ON albums.artist_id=artists.artist_id 
+WHERE genre_id=%s;'''
 
 ### SQL - INSERT
 INSERT_USER = '''INSERT INTO users (username, password, email) VALUES (%s, %s, %s) RETURNING *;'''
 INSERT_GENRE = '''INSERT INTO genres (genre) VALUES (%s) RETURNING *;'''
 INSERT_ARTIST = '''INSERT INTO artists (name) VALUES (%s) RETURNING *;'''
+INSERT_ARTIST_GENRE = '''INSERT INTO artist_genres (artist_id, genre_id) VALUES (%s,%s) RETURNING *;'''
 INSERT_ALBUM = '''INSERT INTO albums (album_title, artist_id, released) VALUES (%s,%s,%s) RETURNING *;'''
 INSERT_SONG = '''INSERT INTO songs (song_title, length, track_number, album_id) VALUES (%s,%s,%s,%s) RETURNING *;'''
 INSERT_SONG_REVIEW = '''INSERT INTO song_reviews (song_id, user_id, rating, review) VALUES (%s,%s,%s,%s) RETURNING *;'''
 INSERT_ALBUM_REVIEW = '''INSERT INTO album_reviews (album_id, user_id, rating, review) VALUES (%s,%s,%s,%s) RETURNING *;'''
+INSERT_ARTIST_GENRE = '''INSERT INTO artist_genres (genre_id, artist_id) VALUES (%s,%s) RETURNING *;'''
+INSERT_SONG_GENRE = '''INSERT INTO song_genres (genre_id,song_id) VALUES (%s,%s) RETURNING *;'''
 
 load_dotenv()
 
@@ -64,14 +130,17 @@ def parseAudioData(file, file_ext):
 	print(data.artist) 
 	print(data.other.get('artist'))
 	## data.year: 2017-06-17 -- datetime.strptime('2014-12-04', '%Y-%m-%d').date()
+	genres = []
+	if data.genre is not None:
+		genres = re.split(r'[;,/]+', data.genre)
 	genre_ids = []
 	artist_ids = []
 	with connection:
 		with connection.cursor() as cursor:
-			for g in re.split(r'[;,/]+', data.genre):
-				g = g.strip()
-				print(g)
+			for g in genres:
 				if type(g) is not None:
+					g = g.strip()
+					#print(g)
 					# print(type(g))
 					cursor.execute(SELECT_GENRE, (g,))
 					genre = cursor.fetchone()
@@ -85,11 +154,12 @@ def parseAudioData(file, file_ext):
 			if artist is None:
 				cursor.execute(INSERT_ARTIST, (data.artist,))
 				artist = cursor.fetchone()
-			artist_ids.append(genre[0])
+			artist_ids.append(artist[0])
 
 			if data.other.get('artist'):
-				for a in re.split(r'[;,/]+', data.other.get('artist')):
-					print(a)
+				#print(data.other.get('artist'))
+				for a in data.other.get('artist'):
+					#print(f'TEST: {a}')
 					if type(a) is not None:
 						# print(type(a))
 						cursor.execute(SELECT_ARTIST, (a,))
@@ -113,6 +183,23 @@ def parseAudioData(file, file_ext):
 				cursor.execute(INSERT_SONG, (data.title, data.duration, data.track, album[0]))
 				song = cursor.fetchone()
 
+			for id in genre_ids:
+				if id is not None:
+					# print(type(g))
+					cursor.execute(SELECT_SONG_GENRE, (id,song[0]))
+					genre = cursor.fetchone()
+					if genre is None:
+						cursor.execute(INSERT_SONG_GENRE, (id,song[0]))
+						genre = cursor.fetchone()
+
+				for a_id in artist_ids:
+					if id is not None:
+						# print(type(g))
+						cursor.execute(SELECT_ARTIST_GENRE, (id,a_id))
+						genre = cursor.fetchone()
+						if genre is None:
+							cursor.execute(INSERT_ARTIST_GENRE, (id,a_id))
+							genre = cursor.fetchone()
 	return None
 
 @app.route('/')
@@ -126,7 +213,9 @@ def index():
 			cursor.execute(CREATE_TABLE_SONGS)
 			cursor.execute(CREATE_TABLE_PLAYLISTS)
 			cursor.execute(CREATE_ALBUM_REVIEWS)
-			#cursor.execute(CREATE_SONG_REVIEWS)
+			cursor.execute(CREATE_SONG_REVIEWS)
+			cursor.execute(CREATE_ARTIST_GENRES)
+			cursor.execute(CREATE_SONG_GENRES)
 			#cursor.execute(CREATE_TABLE_FILES)
 			print("Tables created!!")
 			cursor.execute(SELECT_USERS)
@@ -139,8 +228,12 @@ def index():
 			data_4 = cursor.fetchall()
 			cursor.execute(SELECT_GENRES)
 			data_5 = cursor.fetchall()
+			cursor.execute(SELECT_SONG_GENRES)
+			data_6 = cursor.fetchall()
+			cursor.execute(SELECT_ARTIST_GENRES)
+			data_7 = cursor.fetchall()
 	
-	return render_template('index.html', tables=[data_1, data_2, data_3, data_4, data_5])
+	return render_template('index.html', tables=[data_1, data_2, data_3, data_4, data_5, data_6, data_7])
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -219,19 +312,56 @@ def songInfo(id = None):
 			song = cursor.fetchone()
 			cursor.execute(SELECT_REVIEWS_BY_SONGID, (id,))
 			reviews = cursor.fetchall()
-			return render_template('song_review.html', id=id, song=song, reviews=reviews)
+			cursor.execute(SELECT_GENRES_BY_SONG_ID, (id,))
+			genres = cursor.fetchall()
+			return render_template('song_review.html', id=id, song=song, genres=genres, reviews=reviews)
 	return redirect(url_for('index'))
 
 @app.route('/album/<id>', methods=['GET', 'POST'])
 def albumInfo(id = None):
+	form=ReviewForm();
 	with connection:
 		with connection.cursor() as cursor:
 			cursor.execute(SELECT_ALBUM_BY_ID, (id,))
 			album = cursor.fetchone()
-			print(album)
+			#print(album)
+			cursor.execute(SELECT_SONGS_BY_ALBUM_ID, (id,))
+			songs = cursor.fetchall()
 			cursor.execute(SELECT_REVIEWS_BY_ALBUMID, (id,))
 			reviews = cursor.fetchall()
-			return render_template('album_review.html', id=id, album=album, reviews=reviews)
+			cursor.execute(SELECT_GENRES_BY_ALBUM_ID, (id,))
+			genres = cursor.fetchall()
+			return render_template('album_review.html', id=id, form=form, songs=songs, genres=genres, album=album, reviews=reviews)
+	return redirect(url_for('index'))
+
+@app.route('/artist/<id>', methods=['GET', 'POST'])
+def artistInfo(id = None):
+	form=ReviewForm();
+	with connection:
+		with connection.cursor() as cursor:
+			cursor.execute(SELECT_ARTIST_BY_ID, (id,))
+			artist = cursor.fetchone()
+			#print(album)
+			cursor.execute(SELECT_ALBUMS_BY_ARTIST_ID, (id,))
+			albums = cursor.fetchall()
+			cursor.execute(SELECT_GENRES_BY_ARTIST_ID, (id,))
+			genres = cursor.fetchall()
+			return render_template('artist.html', form=form, id=id, artist=artist, genres=genres, albums=albums,)
+	return redirect(url_for('index'))
+
+@app.route('/genre/<id>', methods=['GET', 'POST'])
+def genre(id = None):
+	form=ReviewForm();
+	with connection:
+		with connection.cursor() as cursor:
+			cursor.execute(SELECT_GENRE_BY_ID, (id,))
+			genre = cursor.fetchone()
+			#print(album)
+			cursor.execute(SELECT_ARTISTS_BY_GENRE_ID, (id,))
+			artists = cursor.fetchall()
+			cursor.execute(SELECT_SONGS_BY_GENRE_ID, (id,))
+			songs = cursor.fetchall()
+			return render_template('genre.html', genre=genre, artists=artists, songs=songs,)
 	return redirect(url_for('index'))
 
 if __name__ == '__main__':

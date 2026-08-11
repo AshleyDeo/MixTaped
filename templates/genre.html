@@ -1,0 +1,39 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<h2>{{genre[1]}}</h2>
+<h3>Songs</h3>
+<table>
+	<thead>
+		<tr>
+			<th>Title</th>
+			<th>Artist</th>
+			<th>Album</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for row in songs %}
+		<tr>
+			<td><a href="/song/{{row[0]}}">{{ row[1] }}</a></td>
+			<td><a href="/artist/{{row[5]}}">{{ row[6] }}</a></td>
+			<td><a href="/album/{{row[2]}}">{{ row[3] }}</a></td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
+<h3>Artists</h3>
+<table>
+	<thead>
+		<tr>
+			<th>Name</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for row in artists %}
+		<tr>
+			<td><a href="/artist/{{row[0]}}">{{ row[1] }}</a></td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
+{%endblock%}
