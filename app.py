@@ -45,15 +45,17 @@ CREATE_ALBUM_REVIEWS = '''CREATE TABLE IF NOT EXISTS album_reviews (
 	album_review_id SERIAL PRIMARY KEY, 
 	user_id integer REFERENCES users (user_id) ON DELETE CASCADE, 
 	album_id integer REFERENCES albums (album_id) ON DELETE CASCADE, 
-	review TEXT, 
-	review_date TIMESTAMP
+	rating integer, 
+	review text, 
+	review_date timestamp DEFAULT now()
 );'''
 CREATE_SONG_REVIEWS = '''CREATE TABLE IF NOT EXISTS song_reviews (
 	song_review_id SERIAL PRIMARY KEY, 
 	user_id integer REFERENCES users (user_id) ON DELETE CASCADE, 
 	song_id integer REFERENCES songs (song_id) ON DELETE CASCADE, 
-	review TEXT, 
-	review_date TIMESTAMP
+	rating integer, 
+	review text, 
+	review_date timestamp DEFAULT now()
 );''' 
 CREATE_ARTIST_GENRES = '''CREATE TABLE IF NOT EXISTS artist_genres (
     artist_id integer REFERENCES artists ON DELETE CASCADE,
@@ -85,9 +87,13 @@ SELECT_SONG = '''SELECT * FROM songs WHERE song_title=%s AND album_id=%s;'''
 SELECT_SONG_BY_ID = '''SELECT * FROM songs JOIN albums ON songs.album_id=albums.album_id JOIN artists ON albums.artist_id=artists.artist_id  WHERE song_id=%s;'''
 SELECT_SONGS_BY_ALBUM_ID = '''SELECT * FROM songs WHERE album_id=%s ORDER BY track_number ASC;'''
 INSERT_ARTIST_GENRE = '''INSERT INTO artist_genres (artist_id, genre_id) VALUES (%s,%s) RETURNING *;'''
-SELECT_REVIEWS_BY_SONGID = '''SELECT * FROM song_reviews WHERE song_id=%s;'''
+SELECT_REVIEWS_BY_SONGID = '''SELECT song_reviews.*, users.username FROM song_reviews 
+JOIN users ON song_reviews.user_id=users.user_id
+WHERE song_id=%s;'''
 SELECT_ALBUM_BY_ID = '''SELECT * FROM albums JOIN artists ON albums.artist_id=artists.artist_id  WHERE album_id=%s;'''
-SELECT_REVIEWS_BY_ALBUMID = '''SELECT * FROM album_reviews WHERE album_id=%s;'''
+SELECT_REVIEWS_BY_ALBUMID = '''SELECT album_reviews.*, users.username FROM album_reviews 
+JOIN users ON album_reviews.user_id=users.user_id
+WHERE album_id=%s;'''
 SELECT_GENRES_BY_SONG_ID = '''SELECT genres.* FROM song_genres JOIN genres ON song_genres.genre_id=genres.genre_id WHERE song_id=%s;'''
 SELECT_GENRES_BY_ALBUM_ID = '''SELECT genres.* FROM songs JOIN song_genres ON songs.song_id=song_genres.song_id JOIN genres ON song_genres.genre_id=genres.genre_id WHERE album_id=%s;'''
 SELECT_SONG_GENRE = '''SELECT * FROM song_genres WHERE genre_id=%s AND song_id=%s;'''
@@ -96,6 +102,10 @@ SELECT_ARTIST_BY_ID = '''SELECT * FROM artists WHERE artist_id=%s;'''
 SELECT_GENRE_BY_ID = '''SELECT * FROM genres WHERE genre_id=%s;'''
 SELECT_ALBUMS_BY_ARTIST_ID = '''SELECT * FROM albums WHERE artist_id=%s ORDER BY released DESC;'''
 SELECT_GENRES_BY_ARTIST_ID = '''SELECT DISTINCT genres.* FROM artist_genres JOIN genres ON artist_genres.genre_id=genres.genre_id WHERE artist_id=%s GROUP BY genres.genre_id;'''
+SELECT_GENRES_BY_ALBUM_ID = '''SELECT DISTINCT genres.* FROM songs
+JOIN song_genres ON songs.song_id=song_genres.song_id
+JOIN genres ON song_genres.genre_id=genres.genre_id 
+WHERE songs.album_id=%s GROUP BY genres.genre_id;'''
 SELECT_ARTISTS_BY_GENRE_ID = '''SELECT artists.* FROM artist_genres JOIN artists ON artist_genres.artist_id=artists.artist_id WHERE genre_id=%s;'''
 SELECT_SONGS_BY_GENRE_ID = '''SELECT songs.*, artists.artist_id, artists.name FROM song_genres 
 JOIN songs ON song_genres.song_id=songs.song_id 
@@ -114,6 +124,9 @@ INSERT_SONG_REVIEW = '''INSERT INTO song_reviews (song_id, user_id, rating, revi
 INSERT_ALBUM_REVIEW = '''INSERT INTO album_reviews (album_id, user_id, rating, review) VALUES (%s,%s,%s,%s) RETURNING *;'''
 INSERT_ARTIST_GENRE = '''INSERT INTO artist_genres (genre_id, artist_id) VALUES (%s,%s) RETURNING *;'''
 INSERT_SONG_GENRE = '''INSERT INTO song_genres (genre_id,song_id) VALUES (%s,%s) RETURNING *;'''
+INSERT_SONG_REVIEW = '''INSERT INTO song_reviews (user_id, song_id, rating, review) VALUES (%s,%s,%s,%s) RETURNING *;'''
+INSERT_ALBUM_REVIEW = '''INSERT INTO album_reviews (user_id, album_id, rating, review) VALUES (%s,%s,%s,%s) RETURNING *;'''
+
 
 load_dotenv()
 
@@ -306,6 +319,14 @@ def upload():
 
 @app.route('/song/<id>', methods=['GET', 'POST'])
 def songInfo(id = None):
+	form=ReviewForm()
+	if form.validate_on_submit():
+		with connection:
+			with connection.cursor() as cursor:
+				cursor.execute(CREATE_SONG_REVIEWS)
+				cursor.execute(INSERT_SONG_REVIEW, (session["user_id"], id, form.rating.data, form.review.data))
+				rating = cursor.fetchone()[0]
+				return redirect(url_for('songInfo', id=id))
 	with connection:
 		with connection.cursor() as cursor:
 			cursor.execute(SELECT_SONG_BY_ID, (id,))
@@ -314,12 +335,19 @@ def songInfo(id = None):
 			reviews = cursor.fetchall()
 			cursor.execute(SELECT_GENRES_BY_SONG_ID, (id,))
 			genres = cursor.fetchall()
-			return render_template('song_review.html', id=id, song=song, genres=genres, reviews=reviews)
+			return render_template('song_review.html', form=form, song=song, genres=genres, reviews=reviews)
 	return redirect(url_for('index'))
 
 @app.route('/album/<id>', methods=['GET', 'POST'])
 def albumInfo(id = None):
-	form=ReviewForm();
+	form=ReviewForm()
+	if form.validate_on_submit():
+		with connection:
+			with connection.cursor() as cursor:
+				cursor.execute(CREATE_ALBUM_REVIEWS)
+				cursor.execute(INSERT_ALBUM_REVIEW, (session["user_id"], id, form.rating.data, form.review.data))
+				rating = cursor.fetchone()[0]
+				return redirect(url_for('albumInfo', id=id))
 	with connection:
 		with connection.cursor() as cursor:
 			cursor.execute(SELECT_ALBUM_BY_ID, (id,))
@@ -331,12 +359,12 @@ def albumInfo(id = None):
 			reviews = cursor.fetchall()
 			cursor.execute(SELECT_GENRES_BY_ALBUM_ID, (id,))
 			genres = cursor.fetchall()
+			print(reviews)
 			return render_template('album_review.html', id=id, form=form, songs=songs, genres=genres, album=album, reviews=reviews)
 	return redirect(url_for('index'))
 
 @app.route('/artist/<id>', methods=['GET', 'POST'])
 def artistInfo(id = None):
-	form=ReviewForm();
 	with connection:
 		with connection.cursor() as cursor:
 			cursor.execute(SELECT_ARTIST_BY_ID, (id,))
@@ -346,12 +374,11 @@ def artistInfo(id = None):
 			albums = cursor.fetchall()
 			cursor.execute(SELECT_GENRES_BY_ARTIST_ID, (id,))
 			genres = cursor.fetchall()
-			return render_template('artist.html', form=form, id=id, artist=artist, genres=genres, albums=albums,)
+			return render_template('artist.html', artist=artist, genres=genres, albums=albums,)
 	return redirect(url_for('index'))
 
 @app.route('/genre/<id>', methods=['GET', 'POST'])
 def genre(id = None):
-	form=ReviewForm();
 	with connection:
 		with connection.cursor() as cursor:
 			cursor.execute(SELECT_GENRE_BY_ID, (id,))
@@ -362,6 +389,7 @@ def genre(id = None):
 			cursor.execute(SELECT_SONGS_BY_GENRE_ID, (id,))
 			songs = cursor.fetchall()
 			return render_template('genre.html', genre=genre, artists=artists, songs=songs,)
+
 	return redirect(url_for('index'))
 
 if __name__ == '__main__':

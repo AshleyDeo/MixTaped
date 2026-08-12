@@ -31,11 +31,22 @@
 	</tbody>
 </table>
 <h3>Reviews</h3>
+<form method="POST" action="">
+	{{ form.hidden_tag() }}
+	<div>
+		{{form.rating()}}
+		{{form.review(class_="review_input")}}
+	</div>
+	<div>
+		{{form.submit()}}
+	</div>
+</form>
 <table>
 	<thead>
 		<tr>
 			<th>ID</th>
 			<th>User</th>
+			<th>Rating</th>
 			<th>Comment</th>
 			<th>Date</th>
 		</tr>
@@ -44,9 +55,10 @@
 		{% for row in reviews %}
 		<tr>
 			<td>{{ row[0] }}</td>
-			<td>{{ row[1] }}</td>
-			<td>{{ row[2] }}</td>
+			<td>{{ row[-1] }}</td>
 			<td>{{ row[3] }}</td>
+			<td>{{ row[4] }}</td>
+			<td>{{ row[5] }}</td>
 		</tr>
 		{% endfor %}
 	</tbody>

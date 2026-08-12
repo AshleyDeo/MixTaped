@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField
-from wtforms import StringField, PasswordField, SubmitField, TextAreaField
-from wtforms.validators import DataRequired, InputRequired, Length, Email, EqualTo, ValidationError
+from wtforms import IntegerField, StringField, PasswordField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, InputRequired, Length, Email, EqualTo, NumberRange, ValidationError
 
 class RegisterForm(FlaskForm):
 	username = StringField('Username', validators=[DataRequired(), Length(min=2, max=100)])
@@ -20,5 +20,6 @@ class AudioForm(FlaskForm):
 	submit = SubmitField('Submit')
 
 class ReviewForm(FlaskForm):
-	review = TextAreaField("Comment", validators=[InputRequired()])
+	rating = IntegerField("Rating", validators=[DataRequired(), NumberRange(min=0, max=10)])
+	review = TextAreaField("Comment", validators=[DataRequired()])
 	submit = SubmitField('Submit')
