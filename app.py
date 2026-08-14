@@ -5,7 +5,7 @@ import re
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, request, render_template, session, url_for
 #from flask_bcrypt import Bcrypt
-from forms import RegisterForm, LoginForm, AudioForm, ReviewForm
+from forms import PlaylistForm, SelectPlaylistForm, RegisterForm, LoginForm, AudioForm, ReviewForm
 from tinytag import TinyTag
 from werkzeug.utils import secure_filename
 
@@ -36,36 +36,48 @@ CREATE_TABLE_SONGS = '''CREATE TABLE IF NOT EXISTS songs (
 	track_number integer DEFAULT 0 NOT NULL
 );'''
 CREATE_TABLE_GENRES = '''CREATE TABLE IF NOT EXISTS genres (genre_id SERIAL PRIMARY KEY, genre VARCHAR(25) NOT NULL UNIQUE);'''
-CREATE_TABLE_PLAYLISTS = '''CREATE TABLE IF NOT EXISTS playlists (
-	playlist_id SERIAL PRIMARY KEY, 
-	user_id integer REFERENCES users ON DELETE CASCADE, 
-	playlist_name VARCHAR(50) NOT NULL UNIQUE
-);'''
+CREATE_TABLE_PLAYLISTS = '''CREATE TABLE IF NOT EXISTS playlists(
+playlist_id SERIAL NOT NULL PRIMARY KEY, 
+playlist_name varchar(100), 
+description text, 
+date_created timestamp DEFAULT now(), 
+user_id integer NOT NULL REFERENCES users ON DELETE CASCADE);'''
 CREATE_ALBUM_REVIEWS = '''CREATE TABLE IF NOT EXISTS album_reviews (
-	album_review_id SERIAL PRIMARY KEY, 
-	user_id integer REFERENCES users (user_id) ON DELETE CASCADE, 
-	album_id integer REFERENCES albums (album_id) ON DELETE CASCADE, 
+	album_review_id SERIAL, 
+	user_id integer NOT NULL REFERENCES users (user_id) ON DELETE CASCADE, 
+	album_id integer NOT NULL REFERENCES albums (album_id) ON DELETE CASCADE, 
 	rating integer, 
 	review text, 
-	review_date timestamp DEFAULT now()
+	review_date timestamp DEFAULT now(),
+	PRIMARY KEY (album_review_id, user_id, album_id)
 );'''
 CREATE_SONG_REVIEWS = '''CREATE TABLE IF NOT EXISTS song_reviews (
-	song_review_id SERIAL PRIMARY KEY, 
+	song_review_id SERIAL, 
 	user_id integer REFERENCES users (user_id) ON DELETE CASCADE, 
 	song_id integer REFERENCES songs (song_id) ON DELETE CASCADE, 
 	rating integer, 
 	review text, 
-	review_date timestamp DEFAULT now()
+	review_date timestamp DEFAULT now(),
+	PRIMARY KEY (song_review_id, user_id, song_id)
 );''' 
 CREATE_ARTIST_GENRES = '''CREATE TABLE IF NOT EXISTS artist_genres (
     artist_id integer REFERENCES artists ON DELETE CASCADE,
-    genre_id integer REFERENCES genres ON DELETE CASCADE
+    genre_id integer REFERENCES genres ON DELETE CASCADE, 
+	PRIMARY KEY (artist_id, genre_id)
 );'''
 CREATE_SONG_GENRES = '''CREATE TABLE IF NOT EXISTS song_genres (
     song_id integer REFERENCES songs ON DELETE CASCADE,
-    genre_id integer REFERENCES genres ON DELETE CASCADE
+    genre_id integer REFERENCES genres ON DELETE CASCADE, 
+	PRIMARY KEY (song_id, genre_id)
 );'''
 CREATE_TABLE_FILES = '''CREATE TABLE IF NOT EXISTS files (id SERIAL PRIMARY KEY, filename VARCHAR(10), file_url TEXT);'''
+CREATE_PLAYLIST_SONGS = '''CREATE TABLE IF NOT EXISTS playlist_songs (
+    playlist_id integer REFERENCES playlists ON DELETE CASCADE,
+    song_id integer REFERENCES songs ON DELETE CASCADE,
+	playlist_position integer DEFAULT 1,
+	date_added timestamp DEFAULT now() NOT NULL, 
+	PRIMARY KEY (playlist_id, song_id)
+);'''
 
 ### SQL - SELECT
 SELECT_USERS = '''SELECT * FROM users;'''
@@ -77,6 +89,9 @@ SELECT_SONG_GENRES = '''SELECT * FROM song_genres;'''
 SELECT_ARTIST_GENRES = '''SELECT * FROM artist_genres;'''
 SELECT_SONG_REVIEWS = '''SELECT * FROM song_reviews WHERE song_id=%s;'''
 SELECT_ALBUM_REVIEWS = '''SELECT * FROM album_reviews WHERE album_id=%s;'''
+SELECT_USER_PLAYLISTS = '''SELECT * FROM playlists WHERE user_id=%s;'''
+SELECT_USER_PLAYLIST_IDS = '''SELECT playlist_id, playlist_name FROM playlists WHERE user_id=%s;'''
+SELECT_PLAYLIST_SONGS_TABLE ='''SELECT * FROM playlist_songs'''
 
 ### SELECT WHERE
 SELECT_USER_LOGIN = '''SELECT * FROM users WHERE email = %s AND password = %s;'''
@@ -112,6 +127,19 @@ JOIN songs ON song_genres.song_id=songs.song_id
 JOIN albums ON songs.album_id=albums.album_id 
 JOIN artists ON albums.artist_id=artists.artist_id 
 WHERE genre_id=%s;'''
+SELECT_ALBUM_REVIEW = '''SELECT * FROM album_reviews WHERE album_id=%s AND user_id=%s;'''
+SELECT_SONG_REVIEW = '''SELECT * FROM song_reviews WHERE song_id=%s AND user_id=%s;'''
+SELECT_PLAYLIST = '''SELECT playlists.*, users.user_id, users.username FROM playlists
+JOIN users ON playlists.user_id=users.user_id
+WHERE playlist_id=%s;'''
+SELECT_PLAYLIST_SONGS = '''SELECT * FROM playlist_songs
+JOIN songs ON playlist_songs.song_id=songs.song_id
+WHERE playlist_id=%s ORDER BY playlist_songs.playlist_position ASC, playlist_songs.date_added DESC;''' 
+SELECT_PLAYLIST_SONG = '''SELECT * FROM playlist_songs WHERE playlist_id=%s AND song_id=%s;'''
+SELECT_ADDED_SONG_INFO = '''SELECT songs.song_title, playlists.playlist_name FROM playlist_songs
+JOIN songs ON playlist_songs.song_id=songs.song_id
+JOIN playlists ON playlist_songs.playlist_id=playlists.playlist_id
+WHERE playlist_songs.playlist_id=%s AND playlist_songs.song_id=%s;'''
 
 ### SQL - INSERT
 INSERT_USER = '''INSERT INTO users (username, password, email) VALUES (%s, %s, %s) RETURNING *;'''
@@ -126,7 +154,12 @@ INSERT_ARTIST_GENRE = '''INSERT INTO artist_genres (genre_id, artist_id) VALUES 
 INSERT_SONG_GENRE = '''INSERT INTO song_genres (genre_id,song_id) VALUES (%s,%s) RETURNING *;'''
 INSERT_SONG_REVIEW = '''INSERT INTO song_reviews (user_id, song_id, rating, review) VALUES (%s,%s,%s,%s) RETURNING *;'''
 INSERT_ALBUM_REVIEW = '''INSERT INTO album_reviews (user_id, album_id, rating, review) VALUES (%s,%s,%s,%s) RETURNING *;'''
+INSERT_PLAYLIST = '''INSERT INTO playlists (user_id, playlist_name, description) VALUES (%s,%s,%s) RETURNING *;'''
+INSERT_PLAYLIST_SONG = '''INSERT INTO playlist_songs (playlist_id, song_id) VALUES (%s,%s) RETURNING *;'''
 
+#UPDATE
+UPDATE_ALBUM_REVIEW = '''UPDATE album_reviews SET rating=%s, review=%s, review_date=now() WHERE album_id=%s AND user_id=%s RETURNING *'''
+UPDATE_SONG_REVIEW = '''UPDATE song_reviews SET rating=%s, review=%s, review_date=now() WHERE song_id=%s AND user_id=%s  RETURNING *'''
 
 load_dotenv()
 
@@ -229,6 +262,7 @@ def index():
 			cursor.execute(CREATE_SONG_REVIEWS)
 			cursor.execute(CREATE_ARTIST_GENRES)
 			cursor.execute(CREATE_SONG_GENRES)
+			cursor.execute(CREATE_PLAYLIST_SONGS)
 			#cursor.execute(CREATE_TABLE_FILES)
 			print("Tables created!!")
 			cursor.execute(SELECT_USERS)
@@ -245,8 +279,10 @@ def index():
 			data_6 = cursor.fetchall()
 			cursor.execute(SELECT_ARTIST_GENRES)
 			data_7 = cursor.fetchall()
+			cursor.execute(SELECT_PLAYLIST_SONGS_TABLE)
+			data_8 = cursor.fetchall()
 	
-	return render_template('index.html', tables=[data_1, data_2, data_3, data_4, data_5, data_6, data_7])
+	return render_template('index.html', tables=[data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8])
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -292,11 +328,22 @@ def logout():
 	flash('You have been logged out!', 'success')
 	return redirect(url_for('index'))
 
-@app.route('/dashboard', methods=['GET'])
+@app.route('/dashboard', methods=['GET','POST'])
 def dashboard():
+	form=PlaylistForm()
 	if 'user_id' not in session:
 		return redirect(url_for('login'))
-	return render_template("dashboard.html")
+	
+	if form.validate_on_submit():
+		with connection:
+			with connection.cursor() as cursor:
+				cursor.execute(INSERT_PLAYLIST, (session['user_id'], form.name.data, form.description.data))
+				return(redirect(url_for('dashboard')))
+	with connection:
+		with connection.cursor() as cursor:
+			cursor.execute(SELECT_USER_PLAYLISTS, (session['user_id'],))
+			playlists = cursor.fetchall()
+	return render_template("dashboard.html", form=form, playlists=playlists)
 
 @app.route('/upload', methods=['GET','POST'])
 def upload():
@@ -320,12 +367,39 @@ def upload():
 @app.route('/song/<id>', methods=['GET', 'POST'])
 def songInfo(id = None):
 	form=ReviewForm()
+	form2=SelectPlaylistForm()
 	if form.validate_on_submit():
 		with connection:
 			with connection.cursor() as cursor:
 				cursor.execute(CREATE_SONG_REVIEWS)
-				cursor.execute(INSERT_SONG_REVIEW, (session["user_id"], id, form.rating.data, form.review.data))
-				rating = cursor.fetchone()[0]
+				cursor.execute(SELECT_SONG_REVIEW, (id, session["user_id"]))
+				review = cursor.fetchone()
+				if review is None:
+					cursor.execute(CREATE_SONG_REVIEWS)
+					cursor.execute(INSERT_SONG_REVIEW, (session["user_id"], id, form.rating.data, form.review.data))
+					rating = cursor.fetchone()[0]
+				else: 
+					cursor.execute(UPDATE_SONG_REVIEW, (form.rating.data, form.review.data, id, session["user_id"]))
+					rating = cursor.fetchone()[0]
+				return redirect(url_for('songInfo', id=id))
+	
+	if form2.validate_on_submit():
+		print("*** Validated ***")
+		with connection:
+			with connection.cursor() as cursor:
+				#print(f'**CHOICE***: {form2.playlists.data}')
+				if form2.playlists.data != 0:
+					cursor.execute(SELECT_PLAYLIST_SONG, (form2.playlists.data, id))
+					song = cursor.fetchone()
+					if song:
+						flash("Song already in playlist")
+					else:
+						cursor.execute(INSERT_PLAYLIST_SONG, (form2.playlists.data, id))
+						added_song = cursor.fetchone()
+						cursor.execute(SELECT_ADDED_SONG_INFO, (form2.playlists.data, id))
+						info = cursor.fetchone()
+						print(info)
+						flash(f"{info[0]} Added to {info[1]}")
 				return redirect(url_for('songInfo', id=id))
 	with connection:
 		with connection.cursor() as cursor:
@@ -335,19 +409,40 @@ def songInfo(id = None):
 			reviews = cursor.fetchall()
 			cursor.execute(SELECT_GENRES_BY_SONG_ID, (id,))
 			genres = cursor.fetchall()
-			return render_template('song_review.html', form=form, song=song, genres=genres, reviews=reviews)
+			cursor.execute(SELECT_USER_PLAYLIST_IDS, (session['user_id'],))
+			playlists = cursor.fetchall()
+			if playlists:
+				print(type(playlists[0][0]))
+				form2.playlists.choices = playlists
+				print(f'**Playlists***: {form2.playlists.choices}') 
+			return render_template('song_review.html', form=form, form2=form2, song=song, genres=genres, reviews=reviews, playlists=playlists)
 	return redirect(url_for('index'))
 
 @app.route('/album/<id>', methods=['GET', 'POST'])
 def albumInfo(id = None):
 	form=ReviewForm()
+	form2=SelectPlaylistForm()
 	if form.validate_on_submit():
 		with connection:
 			with connection.cursor() as cursor:
 				cursor.execute(CREATE_ALBUM_REVIEWS)
-				cursor.execute(INSERT_ALBUM_REVIEW, (session["user_id"], id, form.rating.data, form.review.data))
-				rating = cursor.fetchone()[0]
+				cursor.execute(SELECT_ALBUM_REVIEW, (id, session["user_id"]))
+				review = cursor.fetchone()
+				if review is None:
+					cursor.execute(INSERT_ALBUM_REVIEW, (session["user_id"], id, form.rating.data, form.review.data))
+					rating = cursor.fetchone()[0]
+				else: 
+					cursor.execute(UPDATE_ALBUM_REVIEW, (form.rating.data, form.review.data, id, session["user_id"]))
+					rating = cursor.fetchone()[0]
+				print(rating)
 				return redirect(url_for('albumInfo', id=id))
+	
+	if form2.playlists.data and form2.validate_on_submit():
+		with connection:
+			with connection.cursor() as cursor:
+				cursor.execute(INSERT_PLAYLIST_SONG, (form2.playlists.data, id))
+				return redirect(url_for('albumInfo', id=id))
+
 	with connection:
 		with connection.cursor() as cursor:
 			cursor.execute(SELECT_ALBUM_BY_ID, (id,))
@@ -359,8 +454,13 @@ def albumInfo(id = None):
 			reviews = cursor.fetchall()
 			cursor.execute(SELECT_GENRES_BY_ALBUM_ID, (id,))
 			genres = cursor.fetchall()
-			print(reviews)
-			return render_template('album_review.html', id=id, form=form, songs=songs, genres=genres, album=album, reviews=reviews)
+			cursor.execute(SELECT_USER_PLAYLIST_IDS, (session['user_id'],))
+			playlists = cursor.fetchall()
+			if playlists:
+				form2.playlists.choices = playlists
+				print(playlists)
+			#print(reviews)
+			return render_template('album_review.html', id=id, form=form, form2=form2, songs=songs, genres=genres, album=album, reviews=reviews, playlists=playlists)
 	return redirect(url_for('index'))
 
 @app.route('/artist/<id>', methods=['GET', 'POST'])
@@ -390,6 +490,28 @@ def genre(id = None):
 			songs = cursor.fetchall()
 			return render_template('genre.html', genre=genre, artists=artists, songs=songs,)
 
+	return redirect(url_for('index'))
+
+@app.route('/user/<id>', methods=['GET', 'POST'])
+def user(id = None):
+	if session['user_id'] == id:
+		return redirect(url_for('dashboard'))
+	return redirect(url_for('index'))
+
+@app.route('/playlist/<id>', methods=['GET', 'POST'])
+def playlistInfo(id = None):
+	form = PlaylistForm()
+	if form.validate_on_submit():
+		with connection:
+			with connection.cursor() as cursor:
+				redirect(url_for('playlist', id=id))
+	with connection:
+		with connection.cursor() as cursor:
+			cursor.execute(SELECT_PLAYLIST, (id,))
+			playlist = cursor.fetchone() 
+			cursor.execute(SELECT_PLAYLIST_SONGS, (id,))
+			songs = cursor.fetchall() 
+			return render_template('playlist.html', uid=session['user_id'], form=form, playlist=playlist, songs=songs) 
 	return redirect(url_for('index'))
 
 if __name__ == '__main__':

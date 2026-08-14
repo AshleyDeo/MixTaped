@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField
-from wtforms import IntegerField, StringField, PasswordField, SubmitField, TextAreaField
+from wtforms import IntegerField, SelectField, StringField, PasswordField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, InputRequired, Length, Email, EqualTo, NumberRange, ValidationError
 
 class RegisterForm(FlaskForm):
@@ -23,3 +23,13 @@ class ReviewForm(FlaskForm):
 	rating = IntegerField("Rating", validators=[DataRequired(), NumberRange(min=0, max=10)])
 	review = TextAreaField("Comment", validators=[DataRequired()])
 	submit = SubmitField('Submit')
+
+class PlaylistForm(FlaskForm):
+	name = StringField('Playlist Name', validators=[DataRequired(), Length(min=2, max=100)])
+	description = TextAreaField("Description", validators=[])
+	submit = SubmitField('Create Playlist')
+
+class SelectPlaylistForm(FlaskForm):
+	playlists = SelectField('Playlist', choices=[(0, '')],
+    default=0, coerce=int, validate_choice=False)
+	submit = SubmitField('Add to Playlist')

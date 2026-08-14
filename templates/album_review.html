@@ -10,9 +10,17 @@
 	<span class="genre">
 		<a href="/genre/{{genre[0]}}">{{genre[1]}}</a>
 	</span>
-
 	{% endfor %}
 </div>
+{%if playlists%}
+<form method="POST" action="">
+	{{ form2.hidden_tag() }}
+	<div>
+		{{form2.playlists()}}
+		{{form2.submit()}}
+	</div>
+</form>
+{%endif%}
 <h3>Tracklist</h3>
 <table>
 	<thead>

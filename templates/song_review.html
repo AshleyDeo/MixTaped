@@ -12,6 +12,17 @@
 	</span>
 
 	{% endfor %}
+</div>
+<br>
+{%if playlists%}
+<form method="POST" action="">
+	{{ form2.hidden_tag() }}
+	<div>
+		{{form2.playlists()}}
+		{{form2.submit()}}
+	</div>
+</form>
+{%endif%}
 </div><h3>Reviews</h3>
 <form method="POST" action="">
 	{{ form.hidden_tag() }}
