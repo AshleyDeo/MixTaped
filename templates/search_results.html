@@ -1,0 +1,15 @@
+{% if result %}
+    {% for song in result %}
+    <tr>
+        <td>{{ song.song_id }}</td>
+        <td>{{ song.song_title }}</td>
+        <td>{{ song.album_id }}</td>
+        <td>{{ song.length }}</td>
+        <td>{{ song.track_number }}</td>
+    </tr>
+    {% endfor %}
+{% else %}
+    <tr>
+        <td colspan="5">No songs found.</td>
+    </tr>
+{% endif %}
