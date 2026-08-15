@@ -10,6 +10,19 @@ class RegisterForm(FlaskForm):
 	confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
 	submit = SubmitField('Create Account')
 
+class UpdateUsernameForm(FlaskForm):
+	username = StringField('Username', validators=[DataRequired(), Length(min=2, max=100)])
+	submit = SubmitField('Update Username')
+
+class UpdateEmailForm(FlaskForm):
+	email = StringField('Email', validators=[DataRequired(), Email()])
+	submit = SubmitField('Update Email')
+
+class UpdatePasswordForm(FlaskForm):
+	password = PasswordField('Password', validators=[DataRequired()])
+	confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+	submit = SubmitField('Update Password')
+
 class LoginForm(FlaskForm):
 	email = StringField('Email', validators=[DataRequired(), Email()])
 	password = PasswordField('Password', validators=[DataRequired()])
@@ -28,6 +41,14 @@ class PlaylistForm(FlaskForm):
 	name = StringField('Playlist Name', validators=[DataRequired(), Length(min=2, max=100)])
 	description = TextAreaField("Description", validators=[])
 	submit = SubmitField('Create Playlist')
+
+class PlaylistNameForm(FlaskForm):
+	name = StringField('Playlist Name', validators=[DataRequired(), Length(min=2, max=100)])
+	submit = SubmitField('Update')
+
+class DescriptionForm(FlaskForm):
+	description = TextAreaField("Description", validators=[])
+	submit = SubmitField('Update Description')
 
 class SelectPlaylistForm(FlaskForm):
 	playlists = SelectField('Playlist', choices=[(0, '')],

@@ -2,6 +2,7 @@
 
 {% block content %}
 <h2>{{artist[1]}}</h2>
+<p>{{artist[2]}}</p>
 <div>
 	{% for genre in genres %}
 		<span class="genre">
@@ -10,6 +11,17 @@
 		
 	{% endfor %}
 </div>
+<br>
+<form method="POST" action="">
+	{{ form.hidden_tag() }}
+	<div>
+		{{form.description.label}}
+		{{form.description(class_="review_input")}}
+	</div>
+	<div>
+		{{form.submit()}}
+	</div>
+</form>
 <h3>Albums</h3>
 <table>
 	<thead>

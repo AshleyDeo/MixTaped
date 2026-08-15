@@ -5,7 +5,7 @@ import re
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, request, render_template, session, url_for
 #from flask_bcrypt import Bcrypt
-from forms import PlaylistForm, SelectPlaylistForm, RegisterForm, LoginForm, AudioForm, ReviewForm
+from forms import DescriptionForm, PlaylistForm, PlaylistNameForm, SelectPlaylistForm, RegisterForm, LoginForm, AudioForm, ReviewForm, UpdateEmailForm, UpdatePasswordForm, UpdateUsernameForm
 from tinytag import TinyTag
 from werkzeug.utils import secure_filename
 
@@ -81,6 +81,8 @@ CREATE_PLAYLIST_SONGS = '''CREATE TABLE IF NOT EXISTS playlist_songs (
 
 ### SQL - SELECT
 SELECT_USERS = '''SELECT * FROM users;'''
+SELECT_USERNAME = '''SELECT user_id FROM users WHERE username=%s;'''
+SELECT_EMAIL = '''SELECT user_id FROM users WHERE email =%s;'''
 SELECT_ARTISTS = '''SELECT * FROM artists;'''
 SELECT_ALBUMS = '''SELECT * FROM albums;'''
 SELECT_SONGS = '''SELECT * FROM songs;'''
@@ -89,8 +91,11 @@ SELECT_SONG_GENRES = '''SELECT * FROM song_genres;'''
 SELECT_ARTIST_GENRES = '''SELECT * FROM artist_genres;'''
 SELECT_SONG_REVIEWS = '''SELECT * FROM song_reviews WHERE song_id=%s;'''
 SELECT_ALBUM_REVIEWS = '''SELECT * FROM album_reviews WHERE album_id=%s;'''
-SELECT_USER_PLAYLISTS = '''SELECT * FROM playlists WHERE user_id=%s;'''
-SELECT_USER_PLAYLIST_IDS = '''SELECT playlist_id, playlist_name FROM playlists WHERE user_id=%s;'''
+SELECT_USER_PLAYLISTS = '''SELECT playlists.*, 
+(SELECT COUNT(*) FROM playlist_songs WHERE playlist_songs.playlist_id=playlists.playlist_id)
+FROM playlists WHERE user_id=%s
+ORDER BY playlist_name ASC;'''
+SELECT_USER_PLAYLIST_IDS = '''SELECT playlist_id, playlist_name FROM playlists WHERE user_id=%s ORDER BY playlist_name;'''
 SELECT_PLAYLIST_SONGS_TABLE ='''SELECT * FROM playlist_songs'''
 
 ### SELECT WHERE
@@ -140,6 +145,8 @@ SELECT_ADDED_SONG_INFO = '''SELECT songs.song_title, playlists.playlist_name FRO
 JOIN songs ON playlist_songs.song_id=songs.song_id
 JOIN playlists ON playlist_songs.playlist_id=playlists.playlist_id
 WHERE playlist_songs.playlist_id=%s AND playlist_songs.song_id=%s;'''
+CHECK_PLAYLIST_ALBUM = '''SELECT song_id, songs.song_title FROM songs WHERE album_id=%s AND song_id NOT IN
+(SELECT song_id FROM playlist_songs WHERE  playlist_songs.playlist_id=%s);'''
 
 ### SQL - INSERT
 INSERT_USER = '''INSERT INTO users (username, password, email) VALUES (%s, %s, %s) RETURNING *;'''
@@ -156,10 +163,22 @@ INSERT_SONG_REVIEW = '''INSERT INTO song_reviews (user_id, song_id, rating, revi
 INSERT_ALBUM_REVIEW = '''INSERT INTO album_reviews (user_id, album_id, rating, review) VALUES (%s,%s,%s,%s) RETURNING *;'''
 INSERT_PLAYLIST = '''INSERT INTO playlists (user_id, playlist_name, description) VALUES (%s,%s,%s) RETURNING *;'''
 INSERT_PLAYLIST_SONG = '''INSERT INTO playlist_songs (playlist_id, song_id) VALUES (%s,%s) RETURNING *;'''
+INSERT_PLAYLIST_ALBUM = '''INSERT INTO playlist_songs (playlist_id, song_id) VALUES (%s, SELECT song_id FROM songs WHERE album_id = %s) RETURNING *;'''
 
 #UPDATE
 UPDATE_ALBUM_REVIEW = '''UPDATE album_reviews SET rating=%s, review=%s, review_date=now() WHERE album_id=%s AND user_id=%s RETURNING *'''
 UPDATE_SONG_REVIEW = '''UPDATE song_reviews SET rating=%s, review=%s, review_date=now() WHERE song_id=%s AND user_id=%s  RETURNING *'''
+UPDATE_USERNAME = '''UPDATE users SET username=%s WHERE user_id =%s RETURNING *;'''
+UPDATE_EMAIL = '''UPDATE users SET email=%s WHERE user_id =%s RETURNING *;'''
+UPDATE_PASSWORD = '''UPDATE users SET password=%s WHERE user_id =%s RETURNING *;'''
+UPDATE_ARTIST_DESC = '''UPDATE artists SET description=%s WHERE artist_id=%s RETURNING *;'''
+UPDATE_PLAYLIST_NAME = '''UPDATE playlists SET playlist_name=%s WHERE playlist_id=%s RETURNING *;'''
+UPDATE_PLAYLIST_DESC = '''UPDATE playlists SET description=%s WHERE playlist_id=%s RETURNING *;'''
+
+#DELETE
+DELETE_USER = '''DELETE FROM users WHERE user_id=%s RETURNING *;'''
+DELETE_PLAYLIST = '''DELETE FROM playlists WHERE playlist_id=%s RETURNING *;'''
+DELETE_PLAYLIST_SONG = '''DELETE FROM playlist_songs WHERE playlist_id=%s AND song_id=%s RETURNING *;'''
 
 load_dotenv()
 
@@ -310,9 +329,22 @@ def login():
 def register():
 	form = RegisterForm()
 	if form.validate_on_submit():
+		if form.validate() == False:
+			flash('All Fields are required.')
+			return  redirect(url_for('register'))
 		with connection:
 			with connection.cursor() as cursor:
 				cursor.execute(CREATE_TABLE_USERS)
+				cursor.execute(SELECT_USERNAME, (form.username.data,))
+				users = cursor.fetchone()
+				if users:
+					flash("Username already taken!!")
+					return redirect(url_for('register'))
+				cursor.execute(SELECT_EMAIL, (form.email.data,))
+				users = cursor.fetchone()
+				if users:
+					flash("Email already in use!!")
+					return redirect(url_for('register'))
 				cursor.execute(INSERT_USER, (form.username.data, form.password.data, form.email.data))
 				user = cursor.fetchone()[0]
 				print(f'New User: {user}')
@@ -327,6 +359,82 @@ def logout():
 	session.pop('username')
 	flash('You have been logged out!', 'success')
 	return redirect(url_for('index'))
+
+@app.route('/settings', methods=['GET','POST'])
+def settings():
+	form1 = UpdateUsernameForm()
+	form2 = UpdateEmailForm()
+	form3 = UpdatePasswordForm()
+
+	if form1.validate_on_submit():
+		with connection:
+			with connection.cursor() as cursor:
+				cursor.execute(SELECT_USERNAME, (form1.username.data,))
+				users = cursor.fetchone()
+				if users is None:
+					cursor.execute(UPDATE_USERNAME, (form1.username.data, session['user_id']))
+					session['username'] = form1.username.data
+				else:
+					flash("Username already taken!")
+				return redirect(url_for('settings'))
+
+	if form2.validate_on_submit():
+		with connection:
+			with connection.cursor() as cursor:
+				cursor.execute(SELECT_EMAIL, (form2.email.data,))
+				users = cursor.fetchone()
+				if users is None:
+					cursor.execute(UPDATE_EMAIL, (form2.email.data, session['user_id']))
+				else:
+					flash("Email already in use!")
+				return redirect(url_for('settings'))
+
+	if form3.validate_on_submit():
+		with connection:
+			with connection.cursor() as cursor:
+				cursor.execute(UPDATE_PASSWORD, (form3.password.data, session['user_id']))
+				flash("Password has been updated!")
+				return redirect(url_for('settings'))
+	return render_template('settings.html', forms=[form1, form2, form3], id=session['user_id'])
+
+@app.route('/delete/user/<id>', methods=['GET'])
+def delete_user(id=None):
+	with connection: 
+		with connection.cursor() as cursor:
+			cursor.execute(DELETE_USER, (id,))
+			user = cursor.fetchall()
+			flash('Account has been deleted!', 'success')
+			if session['user_id']:
+				return redirect(url_for('logout'))
+			return redirect(url_for('index'))
+	flash('Account deletion unsuccessful!', 'error')
+	return render_template('settings.html') 
+
+@app.route('/delete/playlist_song/<pid>/<sid>', methods=['GET'])
+def delete_playlist_song(pid=None, sid=None):
+	with connection: 
+		with connection.cursor() as cursor:
+			cursor.execute(DELETE_PLAYLIST_SONG, (pid,sid))
+			song = cursor.fetchall()
+			print(song)
+			if song:
+				flash('Song removed from playlist!', 'success')
+			return redirect(url_for('playlistInfo', id=pid))
+	flash('Could not remove from playlist!', 'error')
+	return redirect(url_for('playlistInfo', id=pid)) 
+
+@app.route('/delete/playlist/<id>', methods=['GET'])
+def delete_playlist(id=None):
+	with connection: 
+		with connection.cursor() as cursor:
+			cursor.execute(DELETE_PLAYLIST, (id,))
+			playlist = cursor.fetchall()
+			print(playlist)
+			if playlist:
+				flash('Playlist deleted!!', 'success')
+			return redirect(url_for('dashboard'))
+	flash('Could not delete playlist!', 'error')
+	return redirect(url_for('dashboard')) 
 
 @app.route('/dashboard', methods=['GET','POST'])
 def dashboard():
@@ -399,7 +507,7 @@ def songInfo(id = None):
 						cursor.execute(SELECT_ADDED_SONG_INFO, (form2.playlists.data, id))
 						info = cursor.fetchone()
 						print(info)
-						flash(f"{info[0]} Added to {info[1]}")
+						flash(f"{info[0]} added to {info[1]}")
 				return redirect(url_for('songInfo', id=id))
 	with connection:
 		with connection.cursor() as cursor:
@@ -440,7 +548,19 @@ def albumInfo(id = None):
 	if form2.playlists.data and form2.validate_on_submit():
 		with connection:
 			with connection.cursor() as cursor:
-				cursor.execute(INSERT_PLAYLIST_SONG, (form2.playlists.data, id))
+				if form2.playlists.data != 0:
+					cursor.execute(CHECK_PLAYLIST_ALBUM, ( id,form2.playlists.data,))
+					songs = cursor.fetchall()
+					print(songs)
+					if songs is None:
+						flash("Album already in playlist")
+					else:
+						for s in songs:
+							cursor.execute(INSERT_PLAYLIST_SONG, (form2.playlists.data, s[0]))
+						
+						cursor.execute(SELECT_PLAYLIST, (form2.playlists.data,))
+						info = cursor.fetchone()
+						flash(f"{len(songs)} song(s) added to {info[1]}")
 				return redirect(url_for('albumInfo', id=id))
 
 	with connection:
@@ -465,6 +585,12 @@ def albumInfo(id = None):
 
 @app.route('/artist/<id>', methods=['GET', 'POST'])
 def artistInfo(id = None):
+	form = DescriptionForm()
+	if form.validate_on_submit():
+		with connection:
+			with connection.cursor() as cursor:
+				cursor.execute(UPDATE_ARTIST_DESC, (form.description.data, id))
+				return redirect(url_for('artistInfo', id=id))
 	with connection:
 		with connection.cursor() as cursor:
 			cursor.execute(SELECT_ARTIST_BY_ID, (id,))
@@ -474,7 +600,7 @@ def artistInfo(id = None):
 			albums = cursor.fetchall()
 			cursor.execute(SELECT_GENRES_BY_ARTIST_ID, (id,))
 			genres = cursor.fetchall()
-			return render_template('artist.html', artist=artist, genres=genres, albums=albums,)
+			return render_template('artist.html', form=form, artist=artist, genres=genres, albums=albums,)
 	return redirect(url_for('index'))
 
 @app.route('/genre/<id>', methods=['GET', 'POST'])
@@ -500,18 +626,27 @@ def user(id = None):
 
 @app.route('/playlist/<id>', methods=['GET', 'POST'])
 def playlistInfo(id = None):
-	form = PlaylistForm()
-	if form.validate_on_submit():
+	form1 = PlaylistNameForm()
+	form2 = DescriptionForm()
+	if form1.validate_on_submit():
 		with connection:
 			with connection.cursor() as cursor:
-				redirect(url_for('playlist', id=id))
+				cursor.execute(UPDATE_PLAYLIST_NAME, (form1.name.data,id))
+				cursor.fetchone()
+				redirect(url_for('playlistInfo', id=id))
+	if form2.validate_on_submit():
+		with connection:
+			with connection.cursor() as cursor:
+				cursor.execute(UPDATE_PLAYLIST_DESC, (form2.description.data,id)) 
+				cursor.fetchone()
+				redirect(url_for('playlistInfo', id=id))
 	with connection:
 		with connection.cursor() as cursor:
 			cursor.execute(SELECT_PLAYLIST, (id,))
 			playlist = cursor.fetchone() 
 			cursor.execute(SELECT_PLAYLIST_SONGS, (id,))
 			songs = cursor.fetchall() 
-			return render_template('playlist.html', uid=session['user_id'], form=form, playlist=playlist, songs=songs) 
+			return render_template('playlist.html', form1=form1, form2=form2, playlist=playlist, songs=songs)
 	return redirect(url_for('index'))
 
 if __name__ == '__main__':

@@ -4,7 +4,6 @@
 <h2>{{album[1]}}</h2>
 <h3>by <a href="/artist/{{album[4]}}">{{album[5]}}</a></h3>
 <div>Released: {{album[3]}}</div>
-</div>
 <div>
 	{% for genre in genres %}
 	<span class="genre">
@@ -13,6 +12,7 @@
 	{% endfor %}
 </div>
 {%if playlists%}
+<br>
 <form method="POST" action="">
 	{{ form2.hidden_tag() }}
 	<div>
