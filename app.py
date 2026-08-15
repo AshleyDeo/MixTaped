@@ -213,8 +213,7 @@ def upload():
 
 @app.rout('/search', methods=['GET','POST'])
 def search():
-
-
+	
 	return render_template('search.html', )
 
 @app.route('/song/<id>', methods=['GET', 'POST'])
