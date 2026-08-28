@@ -1,6 +1,7 @@
 import datetime as dt
-import os 
+import os
 import psycopg2
+from psycopg2.extras import RealDictCursor
 import re
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, request, render_template, session, url_for
@@ -115,8 +116,10 @@ SELECT_ARTIST = '''SELECT * FROM artists WHERE name=%s;'''
 SELECT_ALBUM = '''SELECT * FROM albums WHERE album_title=%s AND artist_id=%s AND released=%s;'''
 SELECT_SONG = '''SELECT * FROM songs WHERE song_title=%s AND album_id=%s;'''
 SELECT_SONG_BY_ID = '''SELECT * FROM songs JOIN albums ON songs.album_id=albums.album_id JOIN artists ON albums.artist_id=artists.artist_id  WHERE song_id=%s;'''
-SELECT_SONGS_BY_ALBUM_ID = '''SELECT * FROM songs WHERE album_id=%s ORDER BY track_number ASC;''' 
-SELECT_REVIEWS_BY_SONGID = '''SELECT song_reviews.*, users.user_id, users.username FROM song_reviews 
+SELECT_SONGS_BY_ALBUM_ID = '''SELECT * FROM songs WHERE album_id=%s ORDER BY track_number ASC;'''
+SELECT_SONG_NAME = '''SELECT * FROM songs WHERE song_title ILIKE %s;'''
+INSERT_ARTIST_GENRE = '''INSERT INTO artist_genres (artist_id, genre_id) VALUES (%s,%s) RETURNING *;'''
+SELECT_REVIEWS_BY_SONGID = '''SELECT song_reviews.*, users.username FROM song_reviews 
 JOIN users ON song_reviews.user_id=users.user_id
 WHERE song_id=%s ORDER BY song_reviews.review_date ASC;''' 
 SELECT_ALBUM_BY_ID = '''SELECT *, artists.artist_id, artists.name FROM albums JOIN artists ON albums.artist_id=artists.artist_id  WHERE album_id=%s;'''
@@ -709,6 +712,23 @@ def playlistInfo(id = None):
 			songs = cursor.fetchall() 
 			return render_template('playlist.html', form1=form1, form2=form2, playlist=playlist, songs=songs)
 	return redirect(url_for('index'))
+
+@app.route('/search', methods=['GET'])
+def search():
+    q = request.args.get("q")
+
+    if q:
+        cursor = connection.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(SELECT_SONG_NAME, ("%" + q + "%",))
+        result = cursor.fetchall()
+    else:
+        result = []
+
+    if request.headers.get("HX-Request"):
+        return render_template("search_results.html", result=result)
+
+    return render_template("search.html", result=result)
+
 
 if __name__ == '__main__':
 	app.run(debug=True)

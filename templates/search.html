@@ -1,0 +1,47 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+
+<h3>Songs</h3>
+
+<section>
+    <div class="columns">
+        <div class="column is-one-third is-offset-one-third">
+            <input 
+                type="text" 
+                class="input" 
+                placeholder="Search" 
+                name="q"
+                hx-get="/search"
+                hx-trigger="keyup changed delay:500ms"
+                hx-target="#result"
+                hx-swap="innerHTML">
+        </div>
+    </div>
+</section>
+
+<table class="table is-fullwidth">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Album</th>
+            <th>Song Length</th>
+            <th>Track Number</th>
+        </tr>
+    </thead>
+
+    <tbody id="result">
+        {% for song in result %}
+        <tr>
+            <td>{{ song.song_id }}</td>
+            <td>{{ song.song_title }}</td>
+            <td>{{ song.album_id }}</td>
+            <td>{{ song.length }}</td>
+            <td>{{ song.track_number }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
