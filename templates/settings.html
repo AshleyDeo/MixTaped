@@ -1,0 +1,35 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<h2>Settings</h2>
+<form method="POST" action="">
+	{{ forms[0].hidden_tag() }}
+	<div>
+		{{forms[0].username.label}}
+		{{forms[0].username()}}
+		{{forms[0].submit()}}
+	</div>
+</form>
+<form method="POST" action="">
+	{{ forms[1].hidden_tag() }}
+	<div>
+		{{forms[1].email.label}}
+		{{forms[1].email()}}
+		{{forms[1].submit()}}
+	</div>
+</form>
+<form method="POST" action="">
+	{{ forms[2].hidden_tag() }}
+	<div>
+		{{forms[2].password.label}}
+		{{forms[2].password()}}
+	</div>
+	<div>
+		{{forms[2].confirm_password.label}}
+		{{forms[2].confirm_password()}}
+		{{forms[2].submit()}}
+	</div>
+</form>
+<a class="nav-button" href="/delete/user/{{id}}">Delete Account</a>
+
+{% endblock %}

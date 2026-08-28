@@ -1,8 +1,62 @@
 {% extends 'layout.html' %}
 
 {% block content %}
-<h2>{{song[1]}}</h2>
-<h3><a href="/artist/{{album[5]}}">by {{song[5]}}</a></h3>
-<h3>{{song[4]}}</h3>
-<div>releasd {{song[3]}}</div>
+<h2>{{song[0][1]}}</h2>
+<h3>by 	<a href="/artist/{{song[0][9]}}">{{song[0][10]}}</a></h3>
+<h3>Album: 
+	<a href="/album/{{song[0][5]}}">{{song[0][6]}}</a></h3>
+<div>Released: {{song[0][8]}}</div>
+<div>
+	{% for genre in genres %}
+	<span class="genre">
+		<a href="/genre/{{genre[0]}}">{{genre[1]}}</a>
+	</span>
+
+	{% endfor %}
+</div>
+<br>
+{%if playlists%}
+<form method="POST" action="">
+	{{ form2.hidden_tag() }}
+	<div>
+		{{form2.playlists()}}
+		{{form2.submit()}}
+	</div>
+</form>
+{%endif%}
+</div><h3>Reviews</h3>
+{% if session['user_id'] %}
+<form method="POST" action="">
+	{{ form.hidden_tag() }}
+	<div>
+		{{form.rating()}}
+		{{form.review(class_="review_input")}}
+	</div>
+	<div>
+		{{form.submit()}}
+	</div>
+</form>
+{%endif%}
+<table>
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>User</th>
+			<th>Rating</th>
+			<th>Comment</th>
+			<th>Date</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for row in reviews %}
+		<tr>
+			<td>{{ row[0] }}</td>
+			<td><a href="/user/{{row[-2]}}">{{ row[-1] }}</a></td>
+			<td>{{ row[3] }}</td>
+			<td>{{ row[4] }}</td>
+			<td>{{ row[5] }}</td>
+		</tr>
+		{% endfor %}
+	</tbody>
+</table>
 {%endblock%}
