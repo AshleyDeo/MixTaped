@@ -1,10 +1,11 @@
 {% extends 'layout.html' %}
 
 {% block content %}
-<h2>{{song[1]}}</h2>
-<h3>by <a href="/artist/{{song[9]}}">{{song[10]}}</a></h3>
-<h3>Album: <a href="/album/{{song[5]}}">{{song[6]}}</a></h3>
-<div>Released: {{song[8]}}</div>
+<h2>{{song[0][1]}}</h2>
+<h3>by 	<a href="/artist/{{song[0][9]}}">{{song[0][10]}}</a></h3>
+<h3>Album: 
+	<a href="/album/{{song[0][5]}}">{{song[0][6]}}</a></h3>
+<div>Released: {{song[0][8]}}</div>
 <div>
 	{% for genre in genres %}
 	<span class="genre">
@@ -24,6 +25,7 @@
 </form>
 {%endif%}
 </div><h3>Reviews</h3>
+{% if session['user_id'] %}
 <form method="POST" action="">
 	{{ form.hidden_tag() }}
 	<div>
@@ -34,6 +36,7 @@
 		{{form.submit()}}
 	</div>
 </form>
+{%endif%}
 <table>
 	<thead>
 		<tr>
@@ -48,7 +51,7 @@
 		{% for row in reviews %}
 		<tr>
 			<td>{{ row[0] }}</td>
-			<td>{{ row[-1] }}</td>
+			<td><a href="/user/{{row[-2]}}">{{ row[-1] }}</a></td>
 			<td>{{ row[3] }}</td>
 			<td>{{ row[4] }}</td>
 			<td>{{ row[5] }}</td>

@@ -16,7 +16,6 @@
 			<a class="logo-title" href="/">MixTaped</a> |
 			{% if session['user_id'] %}
 			<a class="nav-button" href="/dashboard">Dashboard</a> |
-			<a class="nav-button" href="/upload">Upload</a> |
 			<a class="nav-button" href="/settings">Settings</a> |
 			<a class="nav-button" href="/logout">Logout</a>
 			{% else %}
@@ -24,7 +23,8 @@
 
 			<a class="nav-button" href="/register">Create
 				Account</a>
-			{% endif %}
+			{% endif %} |
+			<a class="nav-button" href="/upload">Upload</a>
 		</div>
 
 		<div>
